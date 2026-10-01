@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Starlight Tales AI</title>
+  <title>Two Little Stars</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
@@ -256,7 +256,7 @@
 
   <div class="app-shell">
     <header>
-      <h1>✨ Starlight Tales AI</h1>
+      <h1>✨ Two Little Stars</h1>
       <div class="badge-girls">Jessica (5) & Charlotte (2)</div>
     </header>
 
@@ -354,8 +354,23 @@
       'gemini-2.0-flash'
     ];
 
+    const API_KEY_STORAGE_KEY = 'two_little_stars_gemini_key';
+    const LEGACY_API_KEY_STORAGE_KEY = 'starlight_gemini_key';
+
+    function getSavedApiKey() {
+      const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+      if (savedKey) return savedKey;
+
+      const legacyKey = localStorage.getItem(LEGACY_API_KEY_STORAGE_KEY);
+      if (legacyKey) {
+        localStorage.setItem(API_KEY_STORAGE_KEY, legacyKey);
+        localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
+      }
+      return legacyKey;
+    }
+
     window.onload = () => {
-      const savedKey = localStorage.getItem('starlight_gemini_key');
+      const savedKey = getSavedApiKey();
       if (savedKey) {
         document.getElementById('apiKeyInput').value = savedKey;
         document.getElementById('keyStatus').innerText = '✓ Key loaded';
@@ -372,7 +387,8 @@
     function saveApiKey() {
       const val = document.getElementById('apiKeyInput').value.trim();
       if (val) {
-        localStorage.setItem('starlight_gemini_key', val);
+        localStorage.setItem(API_KEY_STORAGE_KEY, val);
+        localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
         document.getElementById('keyStatus').innerText = '✓ Key saved successfully!';
         setTimeout(() => toggleKeyBox(), 1000);
       }
@@ -450,7 +466,7 @@
     }
 
     async function generateNextChapter(chapterNum, selectedChoice) {
-      const apiKey = localStorage.getItem('starlight_gemini_key') || document.getElementById('apiKeyInput').value.trim();
+      const apiKey = getSavedApiKey() || document.getElementById('apiKeyInput').value.trim();
       if (!apiKey) {
         alert('Please enter your Gemini API key in the ⚙️ API Key box.');
         toggleKeyBox();
