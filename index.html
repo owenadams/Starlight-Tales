@@ -131,6 +131,7 @@
       border: 1.5px solid var(--border);
       border-radius: 14px;
       padding: 12px 10px;
+      min-height: 86px;
       color: var(--text);
       cursor: pointer;
       display: flex;
@@ -143,6 +144,7 @@
       font-weight: 700;
     }
     .preset-btn:active { border-color: var(--primary); background: #233152; }
+    .surprise-btn { border-color: rgba(244, 114, 182, 0.55); background: #28213e; }
     .custom-row { display: flex; gap: 8px; }
     .primary-btn {
       background: linear-gradient(135deg, #6366f1, #a855f7);
@@ -233,6 +235,17 @@
       cursor: pointer;
       text-align: center;
     }
+    #favoritesScreen { display: none; }
+    .favorites-topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .favorites-topbar .menu-header-title { margin: 0; }
+    .favorites-list { display: flex; flex-direction: column; gap: 10px; }
+    .favorite-item { background: #17233f; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .favorite-title { color: #fef08a; font-family: 'Fredoka', sans-serif; font-size: 1.05rem; margin-bottom: 5px; }
+    .favorite-prompt { color: var(--subtext); font-family: 'Quicksand', sans-serif; font-size: 0.8rem; line-height: 1.5; overflow-wrap: anywhere; }
+    .favorite-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+    .favorite-actions .tool-btn { color: var(--text); }
+    .favorite-actions .primary-btn { padding: 8px 12px; font-size: 0.8rem; }
+    .empty-favorites { margin-bottom: 0; }
     .loader-box {
       display: none;
       flex-direction: column;
@@ -262,6 +275,7 @@
 
     <div class="toolbar">
       <button class="tool-btn" id="keyToggleBtn" onclick="toggleKeyBox()">⚙️ API Key</button>
+      <button class="tool-btn" id="favoritesToggleBtn" onclick="showFavorites()">★ Favourites</button>
       <button class="tool-btn" id="glowBtn" onclick="toggleSleepGlow()">🌙 Sleep Glow: Off</button>
     </div>
 
@@ -281,24 +295,11 @@
         <h2 class="menu-header-title">Create Tonight's Tale</h2>
         <p class="menu-sub">Tap a theme or type anything the girls want to hear:</p>
 
-        <div class="preset-grid">
-          <button class="preset-btn" onclick="setPrompt('The baby unicorn who lost her sparkly rainbow shoes')">
-            <span style="font-size: 1.5rem;">🦄🌈</span>
-            <span>Unicorn Shoes</span>
-          </button>
-          <button class="preset-btn" onclick="setPrompt('The baby cow who flew a cozy hay rocket to the moon sheep')">
-            <span style="font-size: 1.5rem;">🚀🐮</span>
-            <span>Moon Cow</span>
-          </button>
-          <button class="preset-btn" onclick="setPrompt('Barnaby Pig and the mystery of the missing golden apples')">
-            <span style="font-size: 1.5rem;">🐷🔍</span>
-            <span>Detective Pig</span>
-          </button>
-          <button class="preset-btn" onclick="setPrompt('Two princess sisters attending the midnight barnyard lullaby ball')">
-            <span style="font-size: 1.5rem;">👑🐑</span>
-            <span>Barnyard Ball</span>
-          </button>
-        </div>
+        <div class="preset-grid" id="presetGrid"></div>
+        <button class="preset-btn surprise-btn" onclick="surpriseMe()">
+          <span style="font-size: 1.5rem;">🎲</span>
+          <span>Surprise Me</span>
+        </button>
 
         <div class="custom-row">
           <input type="text" id="customPrompt" class="input-field" placeholder="e.g. Friendly space ducks exploring a crystal pond" />
@@ -335,6 +336,15 @@
 
         <div class="choices-shelf" id="choicesBox"></div>
       </div>
+
+      <div id="favoritesScreen">
+        <div class="favorites-topbar">
+          <h2 class="menu-header-title">Favourite Stories</h2>
+          <button class="tool-btn" onclick="showSetup()">← Stories</button>
+        </div>
+        <p class="menu-sub empty-favorites" id="favoritesEmpty">Your saved stories will appear here.</p>
+        <div class="favorites-list" id="favoritesList"></div>
+      </div>
     </div>
   </div>
 
@@ -349,6 +359,19 @@
       stars: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80'
     };
 
+    const STORY_THEMES = [
+      { icon: '🦄🌈', name: 'Unicorn Shoes', prompt: 'The baby unicorn who lost her sparkly rainbow shoes' },
+      { icon: '🚀🐮', name: 'Moon Cow', prompt: 'The baby cow who flew a cozy hay rocket to the moon sheep' },
+      { icon: '🐷🔍', name: 'Detective Pig', prompt: 'Barnaby Pig and the mystery of the missing golden apples' },
+      { icon: '👑🐑', name: 'Barnyard Ball', prompt: 'Two princess sisters attending the midnight barnyard lullaby ball' },
+      { icon: '🚂🌙', name: 'Moonlight Train', prompt: 'Jessica and Charlotte take a gentle moonlight train through the stars, helping a sleepy passenger find the right constellation' },
+      { icon: '🦕🛏️', name: 'Dinosaur Sleepover', prompt: 'Jessica and Charlotte have a cozy sleepover with gentle baby dinosaurs who are learning to settle down for the night' },
+      { icon: '🐢🌊', name: 'Undersea Lullaby', prompt: 'Jessica and Charlotte explore a glowing reef and help a little sea turtle find its way home before bedtime' },
+      { icon: '🐰🌲', name: 'Woodland Rescue', prompt: 'Jessica and Charlotte help a lost bunny find its family in a friendly moonlit forest' },
+      { icon: '☁️🏰', name: 'Cloud Castle', prompt: 'Jessica and Charlotte visit a soft cloud castle and help its star keeper find a missing moonbeam' },
+      { icon: '🏰🧸', name: 'Blanket-Fort Kingdom', prompt: 'On a rainy evening, Jessica and Charlotte build a blanket fort that becomes a cozy kingdom with a tiny friendly dragon' }
+    ];
+
     const MODEL_PREFERENCE = [
       'gemini-3.8-flash',
       'gemini-2.0-flash'
@@ -356,6 +379,129 @@
 
     const API_KEY_STORAGE_KEY = 'two_little_stars_gemini_key';
     const LEGACY_API_KEY_STORAGE_KEY = 'starlight_gemini_key';
+    const FAVORITES_STORAGE_KEY = 'two_little_stars_favorites';
+
+    function getFavorites() {
+      try {
+        const favorites = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || '[]');
+        return Array.isArray(favorites) ? favorites : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function renderThemes() {
+      const grid = document.getElementById('presetGrid');
+      STORY_THEMES.forEach(theme => {
+        const button = document.createElement('button');
+        button.className = 'preset-btn';
+        button.setAttribute('aria-label', theme.name);
+
+        const icon = document.createElement('span');
+        icon.style.fontSize = '1.5rem';
+        icon.textContent = theme.icon;
+        const label = document.createElement('span');
+        label.textContent = theme.name;
+
+        button.append(icon, label);
+        button.onclick = () => setPrompt(theme.prompt);
+        grid.appendChild(button);
+      });
+    }
+
+    function renderFavorites() {
+      const favorites = getFavorites();
+      const list = document.getElementById('favoritesList');
+      const empty = document.getElementById('favoritesEmpty');
+      document.getElementById('favoritesToggleBtn').innerText = `★ Favourites (${favorites.length})`;
+      list.replaceChildren();
+      empty.style.display = favorites.length ? 'none' : 'block';
+
+      favorites.forEach(story => {
+        const item = document.createElement('article');
+        item.className = 'favorite-item';
+        const title = document.createElement('h3');
+        title.className = 'favorite-title';
+        title.textContent = story.title || 'Bedtime Story';
+        const prompt = document.createElement('p');
+        prompt.className = 'favorite-prompt';
+        prompt.textContent = story.prompt || `${story.chapters?.length || 0} saved chapters`;
+        const actions = document.createElement('div');
+        actions.className = 'favorite-actions';
+        const removeButton = document.createElement('button');
+        removeButton.className = 'tool-btn';
+        removeButton.textContent = 'Remove';
+        removeButton.onclick = () => removeFavorite(story.id);
+        const readButton = document.createElement('button');
+        readButton.className = 'primary-btn';
+        readButton.textContent = 'Read story';
+        readButton.onclick = () => readFavorite(story.id);
+        actions.append(removeButton, readButton);
+        item.append(title, prompt, actions);
+        list.appendChild(item);
+      });
+    }
+
+    function showSetup() {
+      document.getElementById('setupScreen').style.display = 'block';
+      document.getElementById('readerScreen').style.display = 'none';
+      document.getElementById('loaderBox').style.display = 'none';
+      document.getElementById('favoritesScreen').style.display = 'none';
+    }
+
+    function showFavorites() {
+      document.getElementById('setupScreen').style.display = 'none';
+      document.getElementById('readerScreen').style.display = 'none';
+      document.getElementById('loaderBox').style.display = 'none';
+      document.getElementById('favoritesScreen').style.display = 'block';
+      renderFavorites();
+    }
+
+    function removeFavorite(id) {
+      const favorites = getFavorites().filter(story => story.id !== id);
+      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+      renderFavorites();
+    }
+
+    function readFavorite(id) {
+      const favorite = getFavorites().find(story => story.id === id);
+      if (!favorite || !Array.isArray(favorite.chapters) || !favorite.chapters.length) return;
+
+      currentStoryPrompt = favorite.prompt;
+      currentStoryChapters = favorite.chapters;
+      currentStoryId = favorite.id;
+      isReadingFavorite = true;
+      currentChapter = 1;
+      document.getElementById('favoritesScreen').style.display = 'none';
+      document.getElementById('readerScreen').style.display = 'flex';
+      displayChapter(currentStoryChapters[0]);
+    }
+
+    function saveCurrentFavorite(button) {
+      const favorites = getFavorites();
+      if (favorites.some(story => story.id === currentStoryId)) {
+        button.innerText = '★ Saved to Favourites';
+        button.disabled = true;
+        return;
+      }
+
+      favorites.unshift({
+        id: currentStoryId,
+        title: currentStoryChapters[0]?.title || 'Bedtime Story',
+        prompt: currentStoryPrompt,
+        chapters: currentStoryChapters,
+        savedAt: Date.now()
+      });
+
+      try {
+        localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+        button.innerText = '★ Saved to Favourites';
+        button.disabled = true;
+        renderFavorites();
+      } catch (err) {
+        alert('Could not save this story: ' + err.message);
+      }
+    }
 
     function getSavedApiKey() {
       const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
@@ -370,6 +516,8 @@
     }
 
     window.onload = () => {
+      renderThemes();
+      renderFavorites();
       const savedKey = getSavedApiKey();
       if (savedKey) {
         document.getElementById('apiKeyInput').value = savedKey;
@@ -398,9 +546,18 @@
       document.getElementById('customPrompt').value = text;
     }
 
+    function surpriseMe() {
+      const theme = STORY_THEMES[Math.floor(Math.random() * STORY_THEMES.length)];
+      setPrompt(theme.prompt);
+      generateNextChapter(1, '');
+    }
+
     let currentStoryPrompt = '';
     let currentChapter = 1;
     let storyHistory = '';
+    let currentStoryChapters = [];
+    let currentStoryId = '';
+    let isReadingFavorite = false;
 
     async function getAvailableModels(apiKey) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`);
@@ -476,6 +633,9 @@
       if (chapterNum === 1) {
         currentStoryPrompt = document.getElementById('customPrompt').value.trim() || 'A magical adventure with baby animals and unicorns';
         storyHistory = '';
+        currentStoryChapters = [];
+        currentStoryId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        isReadingFavorite = false;
       }
 
       currentChapter = chapterNum;
@@ -491,7 +651,7 @@ Characters:
 - Jessica: 5 years old, curious, caring, brave older sister who solves puzzles gently.
 - Charlotte: 2 years old, giggly, toddler younger sister who points, makes animal noises ("Moo-moo!", "Baa baa!"), holds hands, and has short cute speech.
 
-Themes: Farm animals, unicorns, princesses, space, talking animals, mysteries.
+Themes: Farm animals, unicorns, princesses, space, trains, dinosaurs, undersea adventures, woodlands, castles, blanket forts, talking animals, and gentle mysteries.
 Tone: Warm, magical, comforting.
 Current chapter: ${chapterNum} of 3.
 Overall story premise: "${currentStoryPrompt}".
@@ -517,6 +677,7 @@ Return pure JSON matching this schema:
       try {
         const chapterData = await callGeminiWithFallback(apiKey, systemPrompt);
         storyHistory += ` Chapter ${chapterNum}: ` + chapterData.paragraphs.join(' ');
+        currentStoryChapters.push(chapterData);
         displayChapter(chapterData);
       } catch (err) {
         alert('Error: ' + err.message);
@@ -549,6 +710,26 @@ Return pure JSON matching this schema:
       const choicesBox = document.getElementById('choicesBox');
       choicesBox.innerHTML = '';
 
+      if (isReadingFavorite) {
+        if (currentChapter < currentStoryChapters.length) {
+          const continueButton = document.createElement('button');
+          continueButton.className = 'night-button';
+          continueButton.textContent = `Continue to Chapter ${currentChapter + 1}`;
+          continueButton.onclick = () => {
+            currentChapter += 1;
+            displayChapter(currentStoryChapters[currentChapter - 1]);
+          };
+          choicesBox.appendChild(continueButton);
+        } else {
+          const backButton = document.createElement('button');
+          backButton.className = 'night-button';
+          backButton.textContent = '★ Back to Favourites';
+          backButton.onclick = showFavorites;
+          choicesBox.appendChild(backButton);
+        }
+        return;
+      }
+
       if (data.choices && data.choices.length > 0) {
         data.choices.forEach(choiceText => {
           const btn = document.createElement('button');
@@ -558,14 +739,16 @@ Return pure JSON matching this schema:
           choicesBox.appendChild(btn);
         });
       } else {
+        const saveButton = document.createElement('button');
+        saveButton.className = 'tool-btn';
+        saveButton.textContent = '☆ Save to Favourites';
+        saveButton.onclick = () => saveCurrentFavorite(saveButton);
+        choicesBox.appendChild(saveButton);
+
         const finishBtn = document.createElement('button');
         finishBtn.className = 'night-button';
         finishBtn.innerHTML = '🌙 Goodnight Jessica & Charlotte (Read Another)';
-        finishBtn.onclick = () => {
-          document.getElementById('readerScreen').style.display = 'none';
-          document.getElementById('setupScreen').style.display = 'block';
-          document.getElementById('customPrompt').value = '';
-        };
+        finishBtn.onclick = showSetup;
         choicesBox.appendChild(finishBtn);
       }
     }
