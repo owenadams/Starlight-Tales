@@ -351,7 +351,6 @@
 
     const MODEL_PREFERENCE = [
       'gemini-3.8-flash',
-      'gemini-2.5-flash',
       'gemini-2.0-flash'
     ];
 
@@ -397,7 +396,9 @@
       const models = (data.models || [])
         .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
         .map(model => model.baseModelId || model.name?.replace(/^models\//, ''))
-        .filter(model => model?.startsWith('gemini-'));
+        .filter(model => model?.startsWith('gemini-'))
+        .filter(model => !/(image|audio|tts|embedding|aqa|robotics|computer-use)/i.test(model))
+        .filter(model => !/^gemini-2\.5-flash(?:-|$)/i.test(model));
       const availableModels = [...new Set(models)];
       const preferredModels = MODEL_PREFERENCE.filter(model => availableModels.includes(model));
       const remainingModels = availableModels
@@ -408,7 +409,7 @@
           return firstIsFlash - secondIsFlash || firstModel.localeCompare(secondModel);
         });
 
-      return [...preferredModels, ...remainingModels].slice(0, 3);
+      return [...preferredModels, ...remainingModels].slice(0, 5);
     }
 
     async function callGeminiWithFallback(apiKey, systemPrompt) {
