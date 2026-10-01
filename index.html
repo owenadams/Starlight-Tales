@@ -349,10 +349,10 @@
       stars: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80'
     };
 
-    // Valid production models tried in sequence
-    const MODEL_CASCADE = [
-      'gemini-2.0-flash',
-      'gemini-pro'
+    const MODEL_PREFERENCE = [
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash'
     ];
 
     window.onload = () => {
@@ -387,10 +387,38 @@
     let currentChapter = 1;
     let storyHistory = '';
 
-    async function callGeminiWithFallback(apiKey, systemPrompt) {
-      let lastErrorMessage = '';
+    async function getAvailableModels(apiKey) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error?.message || `Could not list models (${res.status}).`);
+      }
 
-      for (const model of MODEL_CASCADE) {
+      const models = (data.models || [])
+        .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
+        .map(model => model.baseModelId || model.name?.replace(/^models\//, ''))
+        .filter(model => model?.startsWith('gemini-'));
+      const availableModels = [...new Set(models)];
+      const preferredModels = MODEL_PREFERENCE.filter(model => availableModels.includes(model));
+      const remainingModels = availableModels
+        .filter(model => !preferredModels.includes(model))
+        .sort((firstModel, secondModel) => {
+          const firstIsFlash = /flash/i.test(firstModel) ? 0 : 1;
+          const secondIsFlash = /flash/i.test(secondModel) ? 0 : 1;
+          return firstIsFlash - secondIsFlash || firstModel.localeCompare(secondModel);
+        });
+
+      return [...preferredModels, ...remainingModels].slice(0, 3);
+    }
+
+    async function callGeminiWithFallback(apiKey, systemPrompt) {
+      const models = await getAvailableModels(apiKey);
+      if (!models.length) {
+        throw new Error('This API key has no Gemini models that support generateContent.');
+      }
+
+      const errors = [];
+      for (const model of models) {
         try {
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: 'POST',
@@ -402,21 +430,22 @@
           });
 
           const data = await res.json();
-          if (data.error) {
-            lastErrorMessage = data.error.message;
-            continue; // Move to next model if this one fails
+          if (!res.ok || data.error) {
+            errors.push(`${model}: ${data.error?.message || `Request failed (${res.status}).`}`);
+            continue;
           }
 
           const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (responseText) {
             return JSON.parse(responseText);
           }
+          errors.push(`${model}: The API returned no generated text.`);
         } catch (err) {
-          lastErrorMessage = err.message;
+          errors.push(`${model}: ${err.message}`);
         }
       }
 
-      throw new Error(lastErrorMessage || 'Service busy. Please try again in a moment.');
+      throw new Error(`All available Gemini models failed:\n${errors.join('\n')}`);
     }
 
     async function generateNextChapter(chapterNum, selectedChoice) {
