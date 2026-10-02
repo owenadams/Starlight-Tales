@@ -394,16 +394,16 @@
     };
 
     const STORY_THEMES = [
-      { icon: '🦄🌈', name: 'Unicorn Shoes', prompt: 'The baby unicorn who lost her sparkly rainbow shoes' },
-      { icon: '🚀🐮', name: 'Moon Cow', prompt: 'The baby cow who flew a cozy hay rocket to the moon sheep' },
-      { icon: '🐷🔍', name: 'Detective Pig', prompt: 'Barnaby Pig and the mystery of the missing golden apples' },
-      { icon: '👑🐑', name: 'Barnyard Ball', prompt: 'Two siblings attend the midnight barnyard lullaby ball as a prince and princess' },
-      { icon: '🚂🌙', name: 'Moonlight Train', prompt: 'Two siblings take a gentle moonlight train through the stars, helping a sleepy passenger find the right constellation' },
-      { icon: '🦕🛏️', name: 'Dinosaur Sleepover', prompt: 'Two siblings have a cozy sleepover with gentle baby dinosaurs who are learning to settle down for the night' },
-      { icon: '🐢🌊', name: 'Undersea Lullaby', prompt: 'Two siblings explore a glowing reef and help a little sea turtle find its way home before bedtime' },
-      { icon: '🐰🌲', name: 'Woodland Rescue', prompt: 'Two siblings help a lost bunny find its family in a friendly moonlit forest' },
-      { icon: '☁️🏰', name: 'Cloud Castle', prompt: 'Two siblings visit a soft cloud castle and help its star keeper find a missing moonbeam' },
-      { icon: '🏰🧸', name: 'Blanket-Fort Kingdom', prompt: 'Two siblings build a blanket fort that becomes a cozy kingdom with a tiny friendly dragon' }
+      { icon: '🦄🌈', name: 'Unicorn Shoes', prompt: 'The baby unicorn who lost her sparkly rainbow shoes', photoKeywords: ['unicorn', 'stars', 'sleep'] },
+      { icon: '🚀🐮', name: 'Moon Cow', prompt: 'The baby cow who flew a cozy hay rocket to the moon sheep', photoKeywords: ['space', 'farm', 'stars'] },
+      { icon: '🐷🔍', name: 'Detective Pig', prompt: 'Barnaby Pig and the mystery of the missing golden apples', photoKeywords: ['farm'] },
+      { icon: '👑🐑', name: 'Barnyard Ball', prompt: 'Two siblings attend the midnight barnyard lullaby ball as a prince and princess', photoKeywords: ['farm', 'stars', 'sleep'] },
+      { icon: '🚂🌙', name: 'Moonlight Train', prompt: 'Two siblings take a gentle moonlight train through the stars, helping a sleepy passenger find the right constellation', photoKeywords: ['space', 'stars', 'sleep'] },
+      { icon: '🦕🛏️', name: 'Dinosaur Sleepover', prompt: 'Two siblings have a cozy sleepover with gentle baby dinosaurs who are learning to settle down for the night', photoKeywords: ['farm', 'sleep', 'stars'] },
+      { icon: '🐢🌊', name: 'Undersea Lullaby', prompt: 'Two siblings explore a glowing reef and help a little sea turtle find its way home before bedtime', photoKeywords: ['water'] },
+      { icon: '🐰🌲', name: 'Woodland Rescue', prompt: 'Two siblings help a lost bunny find its family in a friendly moonlit forest', photoKeywords: ['bunny', 'farm', 'sleep'] },
+      { icon: '☁️🏰', name: 'Cloud Castle', prompt: 'Two siblings visit a soft cloud castle and help its star keeper find a missing moonbeam', photoKeywords: ['stars', 'space', 'sleep'] },
+      { icon: '🏰🧸', name: 'Blanket-Fort Kingdom', prompt: 'Two siblings build a blanket fort that becomes a cozy kingdom with a tiny friendly dragon', photoKeywords: ['sleep', 'stars'] }
     ];
 
     const MODEL_PREFERENCE = [
@@ -689,6 +689,7 @@
     let currentStoryChapters = [];
     let currentStoryId = '';
     let isReadingFavorite = false;
+    let currentStoryPhotoKeywords = [];
 
     async function getAvailableModels(apiKey) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`);
@@ -767,6 +768,8 @@
         currentStoryChapters = [];
         currentStoryId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         isReadingFavorite = false;
+        const selectedTheme = STORY_THEMES.find(theme => theme.prompt === currentStoryPrompt);
+        currentStoryPhotoKeywords = selectedTheme?.photoKeywords || [];
       }
 
       currentChapter = chapterNum;
@@ -782,6 +785,10 @@
       const siblingGuidance = olderChild.age === youngerChild.age
         ? 'They are the same age, so let them take turns leading the adventure.'
         : `${olderChild.name} is the older sibling and ${youngerChild.name} is the younger sibling.`;
+      const youngestAge = Math.min(familySettings[0].age, familySettings[1].age);
+      const availablePhotoKeywords = currentStoryPhotoKeywords.length
+        ? currentStoryPhotoKeywords
+        : Object.keys(SCENE_PHOTOS);
 
       const systemPrompt = `
 You are a master children's bedtime story author writing a soothing, coherent 3-chapter bedtime story.
@@ -799,16 +806,20 @@ ${selectedChoice ? `What happened just before: Reader picked: "${selectedChoice}
 ${storyHistory ? `Previous story events: ${storyHistory}` : ''}
 
 Rules:
-- Write 3 to 4 rich, well-paced paragraphs (~180-220 words total for this chapter).
-- Highlight the siblings' caring relationship and age-appropriate reactions.
-- If chapterNum is 1 or 2: Provide 2 simple, engaging next choices for the children to pick.
-- If chapterNum is 3: Wrap up the story completely with a quiet, cozy bedroom tuck-in, ending with both children whispering goodnight and falling peacefully asleep. Return an empty array []
-- Choose one "photoKeyword" from: "unicorn", "space", "farm", "water", "bunny", "stars", "sleep".
+- Write exactly 3 short paragraphs and 70-100 words total for this chapter.
+- Write for the youngest child's listening level (${youngestAge} years old), using familiar, concrete words and actions.
+- Keep sentences short, usually 4-8 words, with one clear idea in each sentence.
+- Do not use metaphors, similes, idioms, personification, poetic wording, or abstract descriptions.
+- Keep events gentle and easy to follow. No danger, threats, villains, or intense suspense.
+- Show the older child's caring nature through one simple helpful action. Give the younger child short, age-appropriate dialogue and gentle repetition. Do not make either child sound babyish.
+- If chapterNum is 1 or 2: Provide 2 short, clear choices, each no longer than 8 words.
+- If chapterNum is 3: End with a simple, calm bedtime scene and both children falling asleep. Return an empty array [] for choices.
+- Choose one "photoKeyword" from: ${availablePhotoKeywords.map(keyword => `"${keyword}"`).join(', ')}.
 
 Return pure JSON matching this schema:
 {
   "title": "Chapter title",
-  "paragraphs": ["paragraph 1", "paragraph 2", "paragraph 3", "paragraph 4"],
+  "paragraphs": ["paragraph 1", "paragraph 2", "paragraph 3"],
   "photoKeyword": "unicorn",
   "choices": ["Choice A", "Choice B"]
 }
@@ -816,6 +827,9 @@ Return pure JSON matching this schema:
 
       try {
         const chapterData = await callGeminiWithFallback(apiKey, systemPrompt);
+        if (currentStoryPhotoKeywords.length) {
+          chapterData.photoKeyword = currentStoryPhotoKeywords[(chapterNum - 1) % currentStoryPhotoKeywords.length];
+        }
         storyHistory += ` Chapter ${chapterNum}: ` + chapterData.paragraphs.join(' ');
         currentStoryChapters.push(chapterData);
         displayChapter(chapterData);
@@ -911,7 +925,10 @@ Return pure JSON matching this schema:
         const finishBtn = document.createElement('button');
         finishBtn.className = 'night-button';
         finishBtn.textContent = `🌙 Goodnight ${familySettings.map(child => child.name).join(' & ')} (Read Another)`;
-        finishBtn.onclick = showSetup;
+        finishBtn.onclick = () => {
+          document.getElementById('customPrompt').value = '';
+          showSetup();
+        };
         choicesBox.appendChild(finishBtn);
       }
     }
